@@ -1,3 +1,5 @@
+> Preserved fork of [Jeff Leek's data-sharing guide](https://github.com/jtleek/datasharing). The guide below is unchanged. Current work is in [csv-quality-report](https://github.com/rodrix91/csv-quality-report) and [ops-field-brief](https://github.com/rodrix91/ops-field-brief).
+
 How to share data with a statistician
 ===========
 
@@ -120,12 +122,12 @@ Continuous variables are anything measured on a quantitative scale that could be
 would be something like weight measured in kg. [Ordinal data](http://en.wikipedia.org/wiki/Ordinal_data) are data that have a fixed, small (< 100) number of levels but are ordered. 
 This could be for example survey responses where the choices are: poor, fair, good. [Categorical data](http://en.wikipedia.org/wiki/Categorical_variable) are data where there
 are multiple categories, but they aren't ordered. One example would be sex: male or female. This coding is attractive because it is self-documenting.  [Missing data](http://en.wikipedia.org/wiki/Missing_data) are data
-that are unobserved and you don't know the mechanism. You should code missing values as `NA`. [Censored data](http://en.wikipedia.org/wiki/Censoring_\(statistics\)) are data
+that are unobserved and you don't know the mechanism. You should code missing values as `NA`. [Censored data](http://en.wikipedia.org/wiki/Censoring_(statistics)) are data
 where you know the missingness mechanism on some level. Common examples are a measurement being below a detection limit
 or a patient being lost to follow-up. They should also be coded as `NA` when you don't have the data. But you should
 also add a new column to your tidy data called, "VariableNameCensored" which should have values of `TRUE` if censored 
 and `FALSE` if not. In the code book you should explain why those values are missing. It is absolutely critical to report
-to the analyst if there is a reason you know about that some of the data are missing. You should also not [impute](http://en.wikipedia.org/wiki/Imputation_\(statistics\))/make up/
+to the analyst if there is a reason you know about that some of the data are missing. You should also not [impute](http://en.wikipedia.org/wiki/Imputation_(statistics))/make up/
 throw away missing observations.
 
 In general, try to avoid coding categorical or ordinal variables as numbers. When you enter the value for sex in the tidy

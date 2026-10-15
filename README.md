@@ -1,4 +1,4 @@
-> Preserved fork of [Jeff Leek's data-sharing guide](https://github.com/jtleek/datasharing). The guide below is unchanged. Current work is in [csv-quality-report](https://github.com/rodrix91/csv-quality-report) and [ops-field-brief](https://github.com/rodrix91/ops-field-brief).
+> Preserved fork of [Jeff Leek's data-sharing guide](https://github.com/jtleek/datasharing). The guide below is unchanged. Current work is in [csv-quality-report](https://github.com/rodrix91/csv-quality-report), [ops-field-brief](https://github.com/rodrix91/ops-field-brief), and [inventory-policy-lab](https://github.com/rodrix91/inventory-policy-lab).
 
 How to share data with a statistician
 ===========

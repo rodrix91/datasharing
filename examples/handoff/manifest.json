@@ -1,0 +1,10 @@
+{
+  "name": "Synthetic orders reproducibility example",
+  "raw": "raw/orders.csv",
+  "raw_sha256": "2b16f7771528dff3820b896da70246ce0cc54f9c23e90b68ff77eaa98394e0d2",
+  "tidy": "tidy/orders.csv",
+  "tidy_sha256": "7f5b7a1873a29ff1edf842a8ad1675cfc774bd390405d58b557bc0a5de11e346",
+  "codebook": "CODEBOOK.md",
+  "recipe": "transform.py",
+  "data_type": "synthetic"
+}

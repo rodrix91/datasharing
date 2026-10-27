@@ -2,3 +2,5 @@
 # Prevent Windows autocrlf checkout conversion from invalidating provenance.
 examples/handoff/raw/*.csv text eol=lf
 examples/handoff/tidy/*.csv text eol=lf
+examples/handoff/CODEBOOK.md text eol=lf
+examples/handoff/transform.py text eol=lf

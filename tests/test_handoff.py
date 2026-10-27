@@ -38,6 +38,35 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
                     verify_package(directory)
 
+    def test_corrupt_codebook_and_transformation_script_are_rejected(self) -> None:
+        for file in ("CODEBOOK.md", "transform.py"):
+            with self.subTest(path=file), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / file
+                target.write_text(
+                    target.read_text(encoding="utf-8") + "\n# unexpected modification\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
+                    verify_package(directory)
+
+    def test_modified_or_missing_metadata_fingerprints_are_rejected(self) -> None:
+        for key in ("raw_sha256", "tidy_sha256", "codebook_sha256", "recipe_sha256"):
+            for replacement in (None, "0" * 64):
+                with self.subTest(key=key, replacement=replacement), tempfile.TemporaryDirectory() as tmp:
+                    directory = Path(tmp) / "handoff"
+                    shutil.copytree(ROOT, directory)
+                    path = directory / "manifest.json"
+                    manifest = json.loads(path.read_text(encoding="utf-8"))
+                    if replacement is None:
+                        del manifest[key]
+                    else:
+                        manifest[key] = replacement
+                    path.write_text(json.dumps(manifest), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
+                        verify_package(directory)
+
     def test_duplicate_order_id_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / "orders.csv"

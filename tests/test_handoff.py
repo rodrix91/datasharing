@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -66,6 +67,32 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                     path.write_text(json.dumps(manifest), encoding="utf-8")
                     with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
                         verify_package(directory)
+
+    def test_modified_recipe_cannot_run_before_checksum_rejection(self) -> None:
+        # Reproduce the actual standalone entrypoint from a separate package
+        # directory, rather than relying on a cached imported Python module.
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            recipe = directory / "transform.py"
+            marker = directory / "untrusted_recipe_executed.txt"
+            recipe.write_text(
+                'from pathlib import Path\n'
+                'Path(__file__).with_name("untrusted_recipe_executed.txt").write_text('
+                '"unexpected execution", encoding="utf-8")\n',
+                encoding="utf-8",
+            )
+            completed = subprocess.run(
+                [sys.executable, str(directory / "verify.py")],
+                cwd=directory,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("Checksum mismatch for transform.py", completed.stderr)
+            self.assertFalse(marker.exists(), "A modified recipe executed before verification")
 
     def test_duplicate_order_id_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

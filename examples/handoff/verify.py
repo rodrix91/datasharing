@@ -22,12 +22,19 @@ def verify_package(directory: Path) -> int:
         raise ValueError("Unexpected synthetic package manifest")
     raw = directory / "raw" / "orders.csv"
     tidy = directory / "tidy" / "orders.csv"
-    for path, key in ((raw, "raw_sha256"), (tidy, "tidy_sha256")):
+    codebook = directory / "CODEBOOK.md"
+    recipe = directory / "transform.py"
+    if not codebook.read_text(encoding="utf-8").strip():
+        raise ValueError("Data dictionary is missing or empty")
+    for path, key in (
+        (raw, "raw_sha256"),
+        (tidy, "tidy_sha256"),
+        (codebook, "codebook_sha256"),
+        (recipe, "recipe_sha256"),
+    ):
         checksum = hashlib.sha256(path.read_bytes()).hexdigest()
         if checksum != manifest.get(key):
-            raise ValueError(f"Checksum mismatch for {path.name}: source was modified")
-    if not (directory / "CODEBOOK.md").read_text(encoding="utf-8").strip():
-        raise ValueError("Data dictionary is missing or empty")
+            raise ValueError(f"Checksum mismatch for {path.name}: package file was modified")
     expected = make_tidy(raw)
     if tidy.read_text(encoding="utf-8") != expected:
         raise ValueError("Tidy data does not reproduce from the unchanged raw dataset")

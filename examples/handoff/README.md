@@ -20,7 +20,7 @@ python examples/handoff/verify.py
 python -m unittest discover -s tests -v
 ```
 
-The first command prints tidy CSV without writing files. The verifier checks the raw and tidy SHA-256 fingerprints against the manifest and compares the saved tidy CSV to a fresh in-memory transformation. The tests also prove that corrupted files, duplicate IDs, invalid quantities and malformed prices fail validation. The [CI workflow](../../.github/workflows/handoff.yml) repeats verification on Linux, Windows and macOS.
+The first command prints tidy CSV without writing files. The verifier checks SHA-256 fingerprints for **all four handoff deliverables**—raw data, tidy output, codebook and transformation script—against the manifest, then compares the saved tidy CSV to a fresh in-memory transformation. These checks catch accidental or unreviewed file drift; they do not authenticate the manifest or replace signed provenance for a real dataset. The tests also prove that corrupted files, duplicate IDs, invalid quantities and malformed prices fail validation. The [CI workflow](../../.github/workflows/handoff.yml) repeats verification on Linux, Windows and macOS.
 
 ## Data handling
 

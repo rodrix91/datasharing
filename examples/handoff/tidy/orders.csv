@@ -1,0 +1,4 @@
+order_id,region,units,unit_price_usd,revenue_usd
+O001,North,2,12.50,25.00
+O002,South,3,7.00,21.00
+O003,North,1,9.25,9.25

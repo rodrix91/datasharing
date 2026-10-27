@@ -1,4 +1,4 @@
-> Preserved fork of [Jeff Leek's data-sharing guide](https://github.com/jtleek/datasharing). The guide below is unchanged. Current work is in [csv-quality-report](https://github.com/rodrix91/csv-quality-report) and [ops-field-brief](https://github.com/rodrix91/ops-field-brief).
+> Preserved fork of [Jeff Leek's data-sharing guide](https://github.com/jtleek/datasharing). The original guide below remains unchanged. An [independent synthetic data handoff companion](examples/handoff/README.md) demonstrates raw data, tidy output, a codebook, a reproducible recipe and verification. Current work is in [csv-quality-report](https://github.com/rodrix91/csv-quality-report) and [ops-field-brief](https://github.com/rodrix91/ops-field-brief).
 
 How to share data with a statistician
 ===========

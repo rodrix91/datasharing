@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
 from pathlib import Path
-
-from transform import make_tidy
 
 
 def verify_package(directory: Path) -> int:
@@ -35,6 +34,12 @@ def verify_package(directory: Path) -> int:
         checksum = hashlib.sha256(path.read_bytes()).hexdigest()
         if checksum != manifest.get(key):
             raise ValueError(f"Checksum mismatch for {path.name}: package file was modified")
+    # Never execute the recipe until its recorded fingerprint has been checked.
+    # Use this verified package's recipe, not an unrelated import from sys.path.
+    namespace = runpy.run_path(str(recipe), run_name="_verified_handoff_recipe")
+    make_tidy = namespace.get("make_tidy")
+    if not callable(make_tidy):
+        raise ValueError("Verified recipe does not expose make_tidy")
     expected = make_tidy(raw)
     if tidy.read_text(encoding="utf-8") != expected:
         raise ValueError("Tidy data does not reproduce from the unchanged raw dataset")

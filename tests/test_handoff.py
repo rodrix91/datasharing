@@ -155,5 +155,37 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 verify_package(directory)
 
 
+    def test_broken_quoted_order_fields_are_rejected(self) -> None:
+        header = "order_id,region,units,unit_price_usd\n"
+        for record in (
+            'O001,"North"junk,2,12.50\n',
+            'O001,"North,2,12.50\n',
+            'O001,"North\nstill unclosed,2,12.50\n',
+        ):
+            with self.subTest(record=record), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "orders.csv"
+                path.write_bytes((header + record).encode("utf-8"))
+                with self.assertRaisesRegex(ValueError, "Malformed CSV near source line"):
+                    make_tidy(path)
+
+    def test_invalid_region_error_uses_physical_line_after_quoted_newline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orders.csv"
+            path.write_bytes(
+                b"order_id,region,units,unit_price_usd\r\n"
+                b"O001,North,2,12.50\r\n"
+                b'O002,"North\r\nSouth",1,5.00\r\n'
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid region on line 4"):
+                make_tidy(path)
+
+    def test_strict_csv_recipe_remains_checksum_verified(self) -> None:
+        manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+        actual = hashlib.sha256((ROOT / "transform.py").read_bytes()).hexdigest()
+        self.assertEqual(manifest["recipe_sha256"], actual)
+        self.assertEqual(verify_package(ROOT), 3)
+
+
+
 if __name__ == "__main__":
     unittest.main()

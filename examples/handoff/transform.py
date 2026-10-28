@@ -15,7 +15,7 @@ TIDY_COLUMNS = [*RAW_COLUMNS, "revenue_usd"]
 def make_tidy(raw_path: Path) -> str:
     """Return canonical, line-feed-delimited tidy CSV without changing the raw file."""
     with raw_path.open("r", encoding="utf-8", newline="") as source:
-        reader = csv.DictReader(source)
+        reader = csv.DictReader(source, strict=True)
         if reader.fieldnames != RAW_COLUMNS:
             raise ValueError(f"Expected raw headers {RAW_COLUMNS!r}")
         result = io.StringIO(newline="")
@@ -23,7 +23,18 @@ def make_tidy(raw_path: Path) -> str:
         writer.writerow(TIDY_COLUMNS)
         seen: set[str] = set()
         count = 0
-        for line, row in enumerate(reader, start=2):
+        # Read with strict CSV syntax. Track physical file lines rather than
+        # record counts because quoted cells can span multiple source lines.
+        while True:
+            try:
+                row = next(reader)
+            except StopIteration:
+                break
+            except csv.Error as exc:
+                raise ValueError(
+                    f"Malformed CSV near source line {reader.line_num}: {exc}"
+                ) from exc
+            line = reader.line_num
             order_id = row.get("order_id") or ""
             region = row.get("region") or ""
             if None in row or any(value is None for value in row.values()):

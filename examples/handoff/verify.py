@@ -4,15 +4,45 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import runpy
 from pathlib import Path
 
 
+def _unique_manifest_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Fail closed on duplicate member names at every JSON object depth."""
+    result: dict[str, object] = {}
+    for name, value in pairs:
+        if name in result:
+            raise ValueError(f"Duplicate JSON manifest key: {name!r}")
+        result[name] = value
+    return result
+
+
+def _reject_manifest_constant(value: str) -> None:
+    """Reject Python's permissive NaN and Infinity non-JSON literals."""
+    raise ValueError(f"Non-standard JSON manifest numeric value: {value}")
+
+
+def _finite_manifest_float(value: str) -> float:
+    """Do not silently decode oversized JSON numeric exponents as infinity."""
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite JSON manifest numeric value: {value}")
+    return number
+
+
 def verify_package(directory: Path) -> int:
     """Verify raw provenance, tidy provenance and deterministic reproducibility."""
-    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (directory / "manifest.json").read_text(encoding="utf-8"),
+        object_pairs_hook=_unique_manifest_keys,
+        parse_constant=_reject_manifest_constant,
+        parse_float=_finite_manifest_float,
+    )
     if (
-        manifest.get("data_type") != "synthetic"
+        not isinstance(manifest, dict)
+        or manifest.get("data_type") != "synthetic"
         or manifest.get("raw") != "raw/orders.csv"
         or manifest.get("tidy") != "tidy/orders.csv"
         or manifest.get("codebook") != "CODEBOOK.md"

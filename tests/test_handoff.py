@@ -153,7 +153,10 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 actual = make_tidy(path).splitlines()[1].split(",")
-                self.assertEqual(actual, ["O001", "North", units, f"{price if '.' in price else price + '.00'}", revenue])
+                self.assertEqual(
+                    actual,
+                    ["O001", "North", units, price, revenue],
+                )
                 self.assertEqual(getcontext().prec, initial_precision)
 
     def test_malformed_headers_and_rows_are_rejected(self) -> None:

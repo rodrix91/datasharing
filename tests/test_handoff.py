@@ -113,6 +113,8 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             "O001,North,2,NaN",
             "O001,North,2,Infinity",
             "O001,North,2,-5.00",
+            "O001,North,2,-0.00",
+            "O001,North,2,-0",
             "O001,North,2,1.999",
             "O001,North,2,nonsense",
         ):

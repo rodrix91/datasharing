@@ -184,6 +184,30 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, diagnostic):
                         make_tidy(path)
 
+    def test_blank_before_multiline_record_cannot_hide_source_defect(self) -> None:
+        header = "order_id,region,units,unit_price_usd\n"
+        first = "O001,North,2,12.50\n"
+        quoted = 'O002,"North\nSouth",1,5.00\n'
+        for eol in ("\n", "\r\n", "\r"):
+            with self.subTest(eol=repr(eol)), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "orders.csv"
+                # Source line 3 is blank; the quoted value begins on line 4
+                # and ends on line 5. DictReader.line_num alone reports 5.
+                source = header + first + "\n" + quoted
+                path.write_bytes(source.replace("\n", eol).encode("utf-8"))
+                with self.assertRaisesRegex(ValueError, "Blank CSV row before source line 4"):
+                    make_tidy(path)
+
+    def test_multiline_without_blank_keeps_physical_error_location(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orders.csv"
+            path.write_bytes(
+                b"order_id,region,units,unit_price_usd\r\n"
+                b'O001,"North\r\nSouth",1,5.00\r\n'
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid region on line 3"):
+                make_tidy(path)
+
     def test_normal_quoted_fields_do_not_trigger_blank_record_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "orders.csv"

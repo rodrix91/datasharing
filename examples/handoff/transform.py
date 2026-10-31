@@ -14,7 +14,8 @@ TIDY_COLUMNS = [*RAW_COLUMNS, "revenue_usd"]
 
 def make_tidy(raw_path: Path) -> str:
     """Return canonical, line-feed-delimited tidy CSV without changing the raw file."""
-    with raw_path.open("r", encoding="utf-8", newline="") as source:
+    # Decode an optional Excel UTF-8 BOM without touching the raw file bytes.
+    with raw_path.open("r", encoding="utf-8-sig", newline="") as source:
         reader = csv.DictReader(source, strict=True)
         if reader.fieldnames != RAW_COLUMNS:
             raise ValueError(f"Expected raw headers {RAW_COLUMNS!r}")

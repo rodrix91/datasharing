@@ -161,6 +161,37 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 )
                 self.assertEqual(getcontext().prec, initial_precision)
 
+    def test_excel_utf8_bom_header_is_accepted_without_rewriting_raw(self) -> None:
+        # Excel can prefix a UTF-8 CSV with a BOM. It is an encoding
+        # signature, not part of the first column name.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orders.csv"
+            original = (
+                "order_id,region,units,unit_price_usd\n"
+                "O001,North,2,12.50\n"
+                "O002,South,1,5.00\n"
+            ).encode("utf-8-sig")
+            path.write_bytes(original)
+            actual = make_tidy(path)
+            self.assertEqual(
+                actual,
+                "order_id,region,units,unit_price_usd,revenue_usd\n"
+                "O001,North,2,12.50,25.00\n"
+                "O002,South,1,5.00,5.00\n",
+            )
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_bom_elsewhere_in_header_is_not_silently_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orders.csv"
+            path.write_text(
+                "order_id,\ufeffregion,units,unit_price_usd\n"
+                "O001,North,2,12.50\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "Expected raw headers"):
+                make_tidy(path)
+
     def test_malformed_headers_and_rows_are_rejected(self) -> None:
         for content in (
             "order_id,units,unit_price_usd\nO001,1,3.00\n",

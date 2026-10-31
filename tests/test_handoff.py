@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import getcontext
 import hashlib
 import json
 import shutil
@@ -120,6 +121,43 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 path.write_text("order_id,region,units,unit_price_usd\n" + row + "\n", encoding="utf-8")
                 with self.assertRaises(ValueError):
                     make_tidy(path)
+
+    def test_large_revenue_is_exact_to_the_cent_without_global_context_change(self) -> None:
+        # Decimal multiplication uses only 28 significant digits by default.
+        # These invoices must not silently gain or lose cents when the
+        # coefficient or quantity exceeds that precision.
+        cases = (
+            (
+                "1.25",
+                "1234567890123456789012345678",
+                "1543209862654320986265432097.50",
+            ),
+            (
+                "123456789012345678901234567.89",
+                "9",
+                "1111111101111111110111111111.01",
+            ),
+            (
+                "0.01",
+                "1234567890123456789012345678",
+                "12345678901234567890123456.78",
+            ),
+        )
+        initial_precision = getcontext().prec
+        for price, units, revenue in cases:
+            with self.subTest(price=price, units=units), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "orders.csv"
+                path.write_text(
+                    "order_id,region,units,unit_price_usd\n"
+                    f"O001,North,{units},{price}\n",
+                    encoding="utf-8",
+                )
+                actual = make_tidy(path).splitlines()[1].split(",")
+                self.assertEqual(
+                    actual,
+                    ["O001", "North", units, price, revenue],
+                )
+                self.assertEqual(getcontext().prec, initial_precision)
 
     def test_malformed_headers_and_rows_are_rejected(self) -> None:
         for content in (

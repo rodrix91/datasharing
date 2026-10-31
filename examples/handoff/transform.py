@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
 RAW_COLUMNS = ["order_id", "region", "units", "unit_price_usd"]
@@ -70,7 +70,15 @@ def make_tidy(raw_path: Path) -> str:
                 raise ValueError(f"Invalid quantity or price on line {line}") from exc
             if not price.is_finite() or price < 0 or price.as_tuple().exponent < -2:
                 raise ValueError(f"Price must be nonnegative with at most 2 decimals (line {line})")
-            revenue = price * units
+            # Multiplication under Decimal's default 28-digit precision can
+            # silently round exact cents for sufficiently large quantities.
+            # A product of an m-digit price coefficient and n-digit integer
+            # needs at most m + n significant digits, so calculate it exactly.
+            with localcontext() as money_context:
+                money_context.prec = max(
+                    money_context.prec, len(price.as_tuple().digits) + len(units_text)
+                )
+                revenue = price * units
             writer.writerow([order_id, region, str(units), f"{price:.2f}", f"{revenue:.2f}"])
             seen.add(order_id)
             count += 1

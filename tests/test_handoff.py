@@ -167,17 +167,17 @@ class SyntheticDataHandoffTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "orders.csv"
             original = (
-                "order_id,region,units,unit_price_usd\\n"
-                "O001,North,2,12.50\\n"
-                "O002,South,1,5.00\\n"
+                "order_id,region,units,unit_price_usd\n"
+                "O001,North,2,12.50\n"
+                "O002,South,1,5.00\n"
             ).encode("utf-8-sig")
             path.write_bytes(original)
             actual = make_tidy(path)
             self.assertEqual(
                 actual,
-                "order_id,region,units,unit_price_usd,revenue_usd\\n"
-                "O001,North,2,12.50,25.00\\n"
-                "O002,South,1,5.00,5.00\\n",
+                "order_id,region,units,unit_price_usd,revenue_usd\n"
+                "O001,North,2,12.50,25.00\n"
+                "O002,South,1,5.00,5.00\n",
             )
             self.assertEqual(path.read_bytes(), original)
 
@@ -185,8 +185,8 @@ class SyntheticDataHandoffTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "orders.csv"
             path.write_text(
-                "order_id,\\ufeffregion,units,unit_price_usd\\n"
-                "O001,North,2,12.50\\n",
+                "order_id,\ufeffregion,units,unit_price_usd\n"
+                "O001,North,2,12.50\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "Expected raw headers"):

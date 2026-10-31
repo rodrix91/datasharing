@@ -44,13 +44,17 @@ def make_tidy(raw_path: Path) -> str:
             region = row.get("region") or ""
             if None in row or any(value is None for value in row.values()):
                 raise ValueError(f"Malformed CSV row {line}")
-            # A gap means DictReader skipped a blank physical line. A quoted
-            # multiline field is allowed through here so its existing field
-            # validation can report the original physical source line.
-            if line > previous_line + 1 and not any(
-                "\n" in value or "\r" in value for value in row.values()
-            ):
-                raise ValueError(f"Blank CSV row before source line {line}")
+            # DictReader's line_num points to the end of a record. Subtract
+            # physical newlines *inside* quoted cells to find its actual start,
+            # so a blank source row immediately before a multiline record
+            # cannot be silently treated as part of the quoted value.
+            internal_newlines = sum(
+                value.count("\n") + value.count("\r") - value.count("\r\n")
+                for value in row.values()
+            )
+            start_line = line - internal_newlines
+            if start_line > previous_line + 1:
+                raise ValueError(f"Blank CSV row before source line {start_line}")
             previous_line = line
             if not re.fullmatch(r"[A-Za-z0-9_-]+", order_id) or order_id in seen:
                 raise ValueError(f"Invalid or duplicate order ID on line {line}")

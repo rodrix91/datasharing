@@ -23,12 +23,17 @@ def make_tidy(raw_path: Path) -> str:
         writer.writerow(TIDY_COLUMNS)
         seen: set[str] = set()
         count = 0
+        previous_line = reader.line_num
         # Read with strict CSV syntax. Track physical file lines rather than
         # record counts because quoted cells can span multiple source lines.
         while True:
             try:
                 row = next(reader)
             except StopIteration:
+                # DictReader silently skips entirely blank physical records.
+                # Reject trailing blank rows instead of hiding raw data defects.
+                if reader.line_num > previous_line:
+                    raise ValueError(f"Blank CSV row at source line {previous_line + 1}")
                 break
             except csv.Error as exc:
                 raise ValueError(
@@ -39,6 +44,14 @@ def make_tidy(raw_path: Path) -> str:
             region = row.get("region") or ""
             if None in row or any(value is None for value in row.values()):
                 raise ValueError(f"Malformed CSV row {line}")
+            # A gap means DictReader skipped a blank physical line. A quoted
+            # multiline field is allowed through here so its existing field
+            # validation can report the original physical source line.
+            if line > previous_line + 1 and not any(
+                "\n" in value or "\r" in value for value in row.values()
+            ):
+                raise ValueError(f"Blank CSV row before source line {line}")
+            previous_line = line
             if not re.fullmatch(r"[A-Za-z0-9_-]+", order_id) or order_id in seen:
                 raise ValueError(f"Invalid or duplicate order ID on line {line}")
             if not re.fullmatch(r"[A-Za-z ]+", region) or not region.strip():

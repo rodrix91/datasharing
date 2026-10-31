@@ -68,7 +68,7 @@ def make_tidy(raw_path: Path) -> str:
                 price = Decimal(row["unit_price_usd"])
             except (InvalidOperation, TypeError, ValueError) as exc:
                 raise ValueError(f"Invalid quantity or price on line {line}") from exc
-            if not price.is_finite() or price < 0 or price.as_tuple().exponent < -2:
+            if not price.is_finite() or price.is_signed() or price.as_tuple().exponent < -2:
                 raise ValueError(f"Price must be nonnegative with at most 2 decimals (line {line})")
             # Multiplication under Decimal's default 28-digit precision can
             # silently round exact cents for sufficiently large quantities.

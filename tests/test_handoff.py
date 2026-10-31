@@ -169,18 +169,18 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                     make_tidy(path)
 
     def test_blank_raw_records_are_not_silently_dropped(self) -> None:
-        header = "order_id,region,units,unit_price_usd\\n"
-        first = "O001,North,2,12.50\\n"
-        second = "O002,South,1,5.00\\n"
+        header = "order_id,region,units,unit_price_usd\n"
+        first = "O001,North,2,12.50\n"
+        second = "O002,South,1,5.00\n"
         for label, body, diagnostic in (
-            ("before data", "\\n" + first, "Blank CSV row before source line 3"),
-            ("between data", first + "\\n" + second, "Blank CSV row before source line 4"),
-            ("after data", first + "\\n", "Blank CSV row at source line 3"),
+            ("before data", "\n" + first, "Blank CSV row before source line 3"),
+            ("between data", first + "\n" + second, "Blank CSV row before source line 4"),
+            ("after data", first + "\n", "Blank CSV row at source line 3"),
         ):
-            for eol in ("\\n", "\\r\\n"):
+            for eol in ("\n", "\r\n"):
                 with self.subTest(case=label, eol=repr(eol)), tempfile.TemporaryDirectory() as tmp:
                     path = Path(tmp) / "orders.csv"
-                    path.write_bytes((header + body).replace("\\n", eol).encode("utf-8"))
+                    path.write_bytes((header + body).replace("\n", eol).encode("utf-8"))
                     with self.assertRaisesRegex(ValueError, diagnostic):
                         make_tidy(path)
 
@@ -188,8 +188,8 @@ class SyntheticDataHandoffTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "orders.csv"
             path.write_text(
-                'order_id,region,units,unit_price_usd\\n'
-                'O001,"North East",2,12.50\\n',
+                'order_id,region,units,unit_price_usd\n'
+                'O001,"North East",2,12.50\n',
                 encoding="utf-8",
             )
             self.assertIn("O001,North East,2,12.50,25.00", make_tidy(path))

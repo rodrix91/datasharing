@@ -121,6 +121,42 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Symbolic link in synthetic package"):
                     verify_package(directory)
 
+    def test_manifest_symlink_is_rejected_before_reading_external_metadata(self) -> None:
+        # The manifest itself must not be redirected outside the handoff,
+        # even when that external manifest contains the correct checksums.
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            original = directory / "manifest.json"
+            outside = Path(tmp) / "external-manifest.json"
+            shutil.copyfile(original, outside)
+            original.unlink()
+            try:
+                original.symlink_to(outside)
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"symbolic links unavailable on this runner: {error}")
+            with self.assertRaisesRegex(
+                ValueError, r"Symbolic link in synthetic package: manifest\.json"
+            ):
+                verify_package(directory)
+
+    def test_package_root_symlink_is_rejected_even_with_valid_contents(self) -> None:
+        # A shortcut to another directory is not a self-contained package
+        # delivered at the requested path.
+        with tempfile.TemporaryDirectory() as tmp:
+            original = Path(tmp) / "real-handoff"
+            alias = Path(tmp) / "handoff-link"
+            shutil.copytree(ROOT, original)
+            self.assertEqual(verify_package(original), 3)
+            try:
+                alias.symlink_to(original, target_is_directory=True)
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"directory symlinks unavailable on this runner: {error}")
+            with self.assertRaisesRegex(
+                ValueError, r"Symbolic link in synthetic package: \."
+            ):
+                verify_package(alias)
+
     def test_modified_recipe_cannot_run_before_checksum_rejection(self) -> None:
         # Reproduce the actual standalone entrypoint from a separate package
         # directory, rather than relying on a cached imported Python module.

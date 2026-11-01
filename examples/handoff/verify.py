@@ -34,8 +34,23 @@ def _finite_manifest_float(value: str) -> float:
 
 def verify_package(directory: Path) -> int:
     """Verify raw provenance, tidy provenance and deterministic reproducibility."""
+    raw = directory / "raw" / "orders.csv"
+    tidy = directory / "tidy" / "orders.csv"
+    codebook = directory / "CODEBOOK.md"
+    recipe = directory / "transform.py"
+    manifest_path = directory / "manifest.json"
+    # Check the complete package boundary before reading metadata or executing
+    # the verified recipe. The manifest and package root must be self-contained
+    # just like the raw/tidy files and folders.
+    for candidate in (
+        directory, manifest_path, directory / "raw", directory / "tidy",
+        raw, tidy, codebook, recipe,
+    ):
+        if candidate.is_symlink():
+            relative = "." if candidate == directory else str(candidate.relative_to(directory))
+            raise ValueError(f"Symbolic link in synthetic package: {relative}")
     manifest = json.loads(
-        (directory / "manifest.json").read_text(encoding="utf-8"),
+        manifest_path.read_text(encoding="utf-8"),
         object_pairs_hook=_unique_manifest_keys,
         parse_constant=_reject_manifest_constant,
         parse_float=_finite_manifest_float,
@@ -49,18 +64,6 @@ def verify_package(directory: Path) -> int:
         or manifest.get("recipe") != "transform.py"
     ):
         raise ValueError("Unexpected synthetic package manifest")
-    raw = directory / "raw" / "orders.csv"
-    tidy = directory / "tidy" / "orders.csv"
-    codebook = directory / "CODEBOOK.md"
-    recipe = directory / "transform.py"
-    # Checksums prove file contents, not self-containment. A symlink with
-    # identical bytes still makes the handoff depend on a path outside it.
-    # Check intermediate data folders as well as the four deliverables.
-    for candidate in (directory / "raw", directory / "tidy", raw, tidy, codebook, recipe):
-        if candidate.is_symlink():
-            raise ValueError(
-                f"Symbolic link in synthetic package: {candidate.relative_to(directory)}"
-            )
     if not codebook.read_text(encoding="utf-8").strip():
         raise ValueError("Data dictionary is missing or empty")
     for path, key in (

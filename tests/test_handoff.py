@@ -157,6 +157,40 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             ):
                 verify_package(alias)
 
+    def test_nonregular_deliverables_are_rejected_without_reading(self) -> None:
+        # Opening a named pipe may block forever. Reject it before attempting
+        # to parse the manifest, hash a file, or execute the recipe.
+        if not hasattr(__import__("os"), "mkfifo"):
+            self.skipTest("Named pipes are unavailable on this platform")
+        import os
+
+        for relative in (
+            "manifest.json", "raw/orders.csv", "tidy/orders.csv",
+            "CODEBOOK.md", "transform.py",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                target.unlink()
+                try:
+                    os.mkfifo(target)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"Named pipes unavailable on this runner: {error}")
+                with self.assertRaisesRegex(ValueError, "Regular file required in synthetic package"):
+                    verify_package(directory)
+
+    def test_directories_cannot_replace_required_files(self) -> None:
+        for relative in ("manifest.json", "raw/orders.csv", "transform.py"):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                target.unlink()
+                target.mkdir()
+                with self.assertRaisesRegex(ValueError, "Regular file required in synthetic package"):
+                    verify_package(directory)
+
     def test_modified_recipe_cannot_run_before_checksum_rejection(self) -> None:
         # Reproduce the actual standalone entrypoint from a separate package
         # directory, rather than relying on a cached imported Python module.

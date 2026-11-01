@@ -49,6 +49,14 @@ def verify_package(directory: Path) -> int:
         if candidate.is_symlink():
             relative = "." if candidate == directory else str(candidate.relative_to(directory))
             raise ValueError(f"Symbolic link in synthetic package: {relative}")
+    # Never read from a FIFO, socket or device disguised as a deliverable.
+    # FIFOs may block indefinitely even before checksum validation begins.
+    for folder in (directory, directory / "raw", directory / "tidy"):
+        if not folder.is_dir():
+            raise ValueError(f"Directory required in synthetic package: {folder}")
+    for file in (manifest_path, raw, tidy, codebook, recipe):
+        if not file.is_file():
+            raise ValueError(f"Regular file required in synthetic package: {file}")
     manifest = json.loads(
         manifest_path.read_text(encoding="utf-8"),
         object_pairs_hook=_unique_manifest_keys,

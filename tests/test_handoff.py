@@ -43,15 +43,15 @@ class SyntheticDataHandoffTests(unittest.TestCase):
     def test_noncanonical_tidy_newlines_fail_even_with_matching_manifest_hash(self) -> None:
         # Universal-newline text reads turn CRLF and CR into LF, which used to
         # mask a noncanonical CSV when its digest was updated in the manifest.
-        for ending in (b"\\r\\n", b"\\r"):
+        for ending in (b"\r\n", b"\r"):
             with self.subTest(ending=repr(ending)), tempfile.TemporaryDirectory() as tmp:
                 directory = Path(tmp) / "handoff"
                 shutil.copytree(ROOT, directory)
                 tidy = directory / "tidy" / "orders.csv"
                 canonical = tidy.read_bytes()
-                self.assertIn(b"\\n", canonical)
-                self.assertNotIn(b"\\r", canonical)
-                altered = canonical.replace(b"\\n", ending)
+                self.assertIn(b"\n", canonical)
+                self.assertNotIn(b"\r", canonical)
+                altered = canonical.replace(b"\n", ending)
                 tidy.write_bytes(altered)
                 self.assertNotEqual(altered, canonical)
                 self.assertEqual(

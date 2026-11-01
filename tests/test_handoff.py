@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import getcontext
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -160,9 +161,8 @@ class SyntheticDataHandoffTests(unittest.TestCase):
     def test_nonregular_deliverables_are_rejected_without_reading(self) -> None:
         # Opening a named pipe may block forever. Reject it before attempting
         # to parse the manifest, hash a file, or execute the recipe.
-        if not hasattr(__import__("os"), "mkfifo"):
+        if not hasattr(os, "mkfifo"):
             self.skipTest("Named pipes are unavailable on this platform")
-        import os
 
         for relative in (
             "manifest.json", "raw/orders.csv", "tidy/orders.csv",

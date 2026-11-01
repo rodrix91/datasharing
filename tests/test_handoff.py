@@ -40,6 +40,32 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
                     verify_package(directory)
 
+    def test_noncanonical_tidy_newlines_fail_even_with_matching_manifest_hash(self) -> None:
+        # Universal-newline text reads turn CRLF and CR into LF, which used to
+        # mask a noncanonical CSV when its digest was updated in the manifest.
+        for ending in (b"\r\n", b"\r"):
+            with self.subTest(ending=repr(ending)), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                tidy = directory / "tidy" / "orders.csv"
+                canonical = tidy.read_bytes()
+                self.assertIn(b"\n", canonical)
+                self.assertNotIn(b"\r", canonical)
+                altered = canonical.replace(b"\n", ending)
+                tidy.write_bytes(altered)
+                self.assertNotEqual(altered, canonical)
+                self.assertEqual(
+                    tidy.read_text(encoding="utf-8"),
+                    canonical.decode("utf-8"),
+                    "Text-mode verification would silently normalize line endings",
+                )
+                path = directory / "manifest.json"
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                manifest["tidy_sha256"] = hashlib.sha256(altered).hexdigest()
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "Tidy data does not reproduce"):
+                    verify_package(directory)
+
     def test_corrupt_codebook_and_transformation_script_are_rejected(self) -> None:
         for file in ("CODEBOOK.md", "transform.py"):
             with self.subTest(path=file), tempfile.TemporaryDirectory() as tmp:

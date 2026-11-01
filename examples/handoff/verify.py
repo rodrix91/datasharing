@@ -71,7 +71,9 @@ def verify_package(directory: Path) -> int:
     if not callable(make_tidy):
         raise ValueError("Verified recipe does not expose make_tidy")
     expected = make_tidy(raw)
-    if tidy.read_text(encoding="utf-8") != expected:
+    # Compare canonical UTF-8 bytes, not text opened in universal-newline
+    # mode: read_text() silently treats CRLF or bare CR as LF on all platforms.
+    if tidy.read_bytes() != expected.encode("utf-8"):
         raise ValueError("Tidy data does not reproduce from the unchanged raw dataset")
     return len(expected.splitlines()) - 1
 

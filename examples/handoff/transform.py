@@ -70,7 +70,7 @@ def make_tidy(raw_path: Path) -> str:
                 # Fixed-point money only. Decimal also accepts scientific
                 # notation, including exponents large enough to exhaust
                 # memory when formatted back to two decimal places.
-                if not re.fullmatch(r"[0-9]+(?:\\.[0-9]{1,2})?", price_text):
+                if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", price_text):
                     raise ValueError("Price must use fixed-point notation")
                 price = Decimal(price_text)
             except (InvalidOperation, TypeError, ValueError) as exc:

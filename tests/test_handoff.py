@@ -95,6 +95,32 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
                         verify_package(directory)
 
+    def test_symlinked_deliverables_and_data_folders_are_rejected(self) -> None:
+        # Identical external bytes can satisfy all four checksums, but cannot
+        # be handed to a recipient as a self-contained package.
+        for relative in (
+            "raw", "tidy", "raw/orders.csv", "tidy/orders.csv",
+            "CODEBOOK.md", "transform.py",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                self.assertEqual(verify_package(directory), 3)
+                target = directory / relative
+                outside = Path(tmp) / "external"
+                if target.is_dir():
+                    shutil.copytree(target, outside)
+                    shutil.rmtree(target)
+                else:
+                    shutil.copyfile(target, outside)
+                    target.unlink()
+                try:
+                    target.symlink_to(outside, target_is_directory=outside.is_dir())
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"symbolic links unavailable on this runner: {error}")
+                with self.assertRaisesRegex(ValueError, "Symbolic link in synthetic package"):
+                    verify_package(directory)
+
     def test_modified_recipe_cannot_run_before_checksum_rejection(self) -> None:
         # Reproduce the actual standalone entrypoint from a separate package
         # directory, rather than relying on a cached imported Python module.

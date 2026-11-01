@@ -53,6 +53,14 @@ def verify_package(directory: Path) -> int:
     tidy = directory / "tidy" / "orders.csv"
     codebook = directory / "CODEBOOK.md"
     recipe = directory / "transform.py"
+    # Checksums prove file contents, not self-containment. A symlink with
+    # identical bytes still makes the handoff depend on a path outside it.
+    # Check intermediate data folders as well as the four deliverables.
+    for candidate in (directory / "raw", directory / "tidy", raw, tidy, codebook, recipe):
+        if candidate.is_symlink():
+            raise ValueError(
+                f"Symbolic link in synthetic package: {candidate.relative_to(directory)}"
+            )
     if not codebook.read_text(encoding="utf-8").strip():
         raise ValueError("Data dictionary is missing or empty")
     for path, key in (

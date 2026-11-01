@@ -66,7 +66,13 @@ def make_tidy(raw_path: Path) -> str:
                 if not re.fullmatch(r"[1-9][0-9]*", units_text):
                     raise ValueError("Units must be a positive integer")
                 units = int(units_text)
-                price = Decimal(row["unit_price_usd"])
+                price_text = row["unit_price_usd"]
+                # Fixed-point money only. Decimal also accepts scientific
+                # notation, including exponents large enough to exhaust
+                # memory when formatted back to two decimal places.
+                if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", price_text):
+                    raise ValueError("Price must use fixed-point notation")
+                price = Decimal(price_text)
             except (InvalidOperation, TypeError, ValueError) as exc:
                 raise ValueError(f"Invalid quantity or price on line {line}") from exc
             if not price.is_finite() or price.is_signed() or price.as_tuple().exponent < -2:

@@ -124,6 +124,52 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     make_tidy(path)
 
+    def test_price_must_use_plain_fixed_point_notation(self) -> None:
+        # Decimal() accepts signed and exponential representations that
+        # violate the codebook's fixed-point monetary input contract.
+        invalid = (
+            "1e2",
+            "1E+2",
+            "1e999999999",
+            "0e0",
+            "+2.00",
+            ".50",
+            "2.",
+            "2.00e0",
+            " 2.00",
+            "2.00 ",
+        )
+        for price in invalid:
+            with self.subTest(price=price), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "orders.csv"
+                path.write_text(
+                    "order_id,region,units,unit_price_usd\n"
+                    f"O001,North,2,{price}\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ValueError, "Invalid quantity or price"):
+                    make_tidy(path)
+
+    def test_plain_fixed_point_prices_keep_exact_canonical_cents(self) -> None:
+        for price, canonical, revenue in (
+            ("0", "0.00", "0.00"),
+            ("0.01", "0.01", "0.02"),
+            ("12", "12.00", "24.00"),
+            ("12.5", "12.50", "25.00"),
+            ("12.50", "12.50", "25.00"),
+        ):
+            with self.subTest(price=price), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "orders.csv"
+                path.write_text(
+                    "order_id,region,units,unit_price_usd\n"
+                    f"O001,North,2,{price}\n",
+                    encoding="utf-8",
+                )
+                self.assertEqual(
+                    make_tidy(path).splitlines()[1],
+                    f"O001,North,2,{canonical},{revenue}",
+                )
+
     def test_large_revenue_is_exact_to_the_cent_without_global_context_change(self) -> None:
         # Decimal multiplication uses only 28 significant digits by default.
         # These invoices must not silently gain or lose cents when the

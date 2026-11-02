@@ -64,6 +64,17 @@ def verify_package(directory: Path) -> int:
             raise ValueError(
                 f"Hard link in synthetic package: {file.relative_to(directory)}"
             )
+    # The manifest names one data file in each folder. Additional files are
+    # not covered by its checksums and could unintentionally expose datasets
+    # when a teaching package is shared or published.
+    for folder in (directory / "raw", directory / "tidy"):
+        unexpected = sorted(
+            entry.name for entry in folder.iterdir() if entry.name != "orders.csv"
+        )
+        if unexpected:
+            raise ValueError(
+                f"Unlisted files in synthetic package {folder.name}/: {', '.join(unexpected)}"
+            )
     manifest = json.loads(
         manifest_path.read_text(encoding="utf-8"),
         object_pairs_hook=_unique_manifest_keys,

@@ -158,6 +158,34 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             ):
                 verify_package(alias)
 
+    def test_unlisted_root_files_and_directories_are_rejected(self) -> None:
+        # The manifest hashes known deliverables, but a loose CSV or .env
+        # alongside them could still be included accidentally in a handoff.
+        for extra in ("unexpected.csv", ".env", "draft-notes", ".private-folder"):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                self.assertEqual(verify_package(directory), 3)
+                target = directory / extra
+                if extra.endswith("folder"):
+                    target.mkdir()
+                else:
+                    target.write_text("outside manifest inventory", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValueError, "Unlisted files in synthetic package root"
+                ):
+                    verify_package(directory)
+
+    def test_normal_python_bytecode_cache_does_not_break_verification(self) -> None:
+        # The test runner may import verify.py and transform.py before
+        # inspecting the source package. Ignore only the conventional cache
+        # directory as a runtime artifact; do not ignore arbitrary root files.
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            (directory / "__pycache__").mkdir(exist_ok=True)
+            self.assertEqual(verify_package(directory), 3)
+
     def test_unlisted_data_files_are_rejected_before_recipe_execution(self) -> None:
         # A package with valid checksums may still accidentally include
         # personal or internal files that the manifest never inventories.

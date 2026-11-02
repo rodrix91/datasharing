@@ -57,6 +57,13 @@ def verify_package(directory: Path) -> int:
     for file in (manifest_path, raw, tidy, codebook, recipe):
         if not file.is_file():
             raise ValueError(f"Regular file required in synthetic package: {file}")
+        # Hard links also share an inode with another path. A checksum can
+        # pass even when a supposedly independent deliverable is writable
+        # through a file outside the package; refuse multi-linked files.
+        if file.stat().st_nlink > 1:
+            raise ValueError(
+                f"Hard link in synthetic package: {file.relative_to(directory)}"
+            )
     manifest = json.loads(
         manifest_path.read_text(encoding="utf-8"),
         object_pairs_hook=_unique_manifest_keys,

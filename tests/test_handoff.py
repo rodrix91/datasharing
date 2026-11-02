@@ -158,6 +158,26 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             ):
                 verify_package(alias)
 
+    def test_unlisted_data_files_are_rejected_before_recipe_execution(self) -> None:
+        # A package with valid checksums may still accidentally include
+        # personal or internal files that the manifest never inventories.
+        for folder in ("raw", "tidy"):
+            for extra in ("untracked.csv", ".private", "nested"):
+                with self.subTest(folder=folder, extra=extra), tempfile.TemporaryDirectory() as tmp:
+                    directory = Path(tmp) / "handoff"
+                    shutil.copytree(ROOT, directory)
+                    self.assertEqual(verify_package(directory), 3)
+                    unexpected = directory / folder / extra
+                    if extra == "nested":
+                        unexpected.mkdir()
+                    else:
+                        unexpected.write_text("not part of this package", encoding="utf-8")
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        f"Unlisted files in synthetic package {folder}/",
+                    ):
+                        verify_package(directory)
+
     def test_hardlinked_deliverables_are_rejected_before_reading(self) -> None:
         # A regular file can share an inode with an external file without
         # being a symlink. Its current bytes and SHA-256 may still match.

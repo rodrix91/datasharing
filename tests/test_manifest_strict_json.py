@@ -71,7 +71,7 @@ class StrictManifestTests(unittest.TestCase):
             '"hidden_columns": ["personal_id", "address"]',
         ):
             with self.subTest(extra=unexpected):
-                modified = original.rstrip()[:-1] + f",\\n  {unexpected}\\n}}\\n"
+                modified = original.rstrip()[:-1] + f",\n  {unexpected}\n}}\n"
                 self._check_invalid_manifest(modified, "Unexpected JSON manifest keys")
 
     def test_root_must_be_a_manifest_object(self) -> None:

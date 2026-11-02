@@ -38,13 +38,15 @@ def verify_package(directory: Path) -> int:
     tidy = directory / "tidy" / "orders.csv"
     codebook = directory / "CODEBOOK.md"
     recipe = directory / "transform.py"
+    readme = directory / "README.md"
+    verifier = directory / "verify.py"
     manifest_path = directory / "manifest.json"
     # Check the complete package boundary before reading metadata or executing
     # the verified recipe. The manifest and package root must be self-contained
     # just like the raw/tidy files and folders.
     for candidate in (
         directory, manifest_path, directory / "raw", directory / "tidy",
-        raw, tidy, codebook, recipe,
+        raw, tidy, codebook, recipe, readme, verifier,
     ):
         if candidate.is_symlink():
             relative = "." if candidate == directory else str(candidate.relative_to(directory))
@@ -54,7 +56,7 @@ def verify_package(directory: Path) -> int:
     for folder in (directory, directory / "raw", directory / "tidy"):
         if not folder.is_dir():
             raise ValueError(f"Directory required in synthetic package: {folder}")
-    for file in (manifest_path, raw, tidy, codebook, recipe):
+    for file in (manifest_path, raw, tidy, codebook, recipe, readme, verifier):
         if not file.is_file():
             raise ValueError(f"Regular file required in synthetic package: {file}")
         # Hard links also share an inode with another path. A checksum can

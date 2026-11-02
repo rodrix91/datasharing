@@ -122,6 +122,53 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Symbolic link in synthetic package"):
                     verify_package(directory)
 
+    def test_readme_and_verifier_must_be_regular_local_files(self) -> None:
+        # The documented package inventory also contains these two files.
+        # Neither may point outside the delivered folder.
+        for relative in ("README.md", "verify.py"):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                external = Path(tmp) / ("outside-" + relative)
+                shutil.copyfile(target, external)
+                target.unlink()
+                try:
+                    target.symlink_to(external)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"Symbolic links unavailable on this runner: {error}")
+                with self.assertRaisesRegex(
+                    ValueError, rf"Symbolic link in synthetic package: {relative}"
+                ):
+                    verify_package(directory)
+
+    def test_missing_readme_or_verifier_invalidates_handoff(self) -> None:
+        for relative in ("README.md", "verify.py"):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                (directory / relative).unlink()
+                with self.assertRaisesRegex(ValueError, "Regular file required"):
+                    verify_package(directory)
+
+    def test_hardlinked_readme_or_verifier_invalidates_handoff(self) -> None:
+        for relative in ("README.md", "verify.py"):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                external = Path(tmp) / ("outside-" + relative)
+                shutil.copyfile(target, external)
+                target.unlink()
+                try:
+                    os.link(external, target)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"Hard links unavailable on this runner: {error}")
+                if target.stat().st_nlink <= 1:
+                    self.skipTest("This file system does not report hard-link counts")
+                with self.assertRaisesRegex(ValueError, "Hard link in synthetic package"):
+                    verify_package(directory)
+
     def test_manifest_symlink_is_rejected_before_reading_external_metadata(self) -> None:
         # The manifest itself must not be redirected outside the handoff,
         # even when that external manifest contains the correct checksums.

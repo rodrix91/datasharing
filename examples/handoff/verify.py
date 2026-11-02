@@ -77,6 +77,18 @@ def verify_package(directory: Path) -> int:
         raise ValueError(
             f"Unlisted files in synthetic package root: {', '.join(extra_root)}"
         )
+    cache = directory / "__pycache__"
+    if cache.is_symlink() or (
+        cache.exists()
+        and (
+            not cache.is_dir()
+            or any(
+                not item.is_file() or item.is_symlink() or item.suffix != ".pyc"
+                for item in cache.iterdir()
+            )
+        )
+    ):
+        raise ValueError("Unlisted files in synthetic package Python cache")
     # The manifest names one data file in each folder. Additional files are
     # not covered by its checksums and could unintentionally expose datasets
     # when a teaching package is shared or published.

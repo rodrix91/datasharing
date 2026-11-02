@@ -64,6 +64,19 @@ def verify_package(directory: Path) -> int:
             raise ValueError(
                 f"Hard link in synthetic package: {file.relative_to(directory)}"
             )
+    # The top-level handoff also has a fixed inventory. A stray .env, data
+    # export, or nested folder must not ship merely because the four checksums
+    # still match. Python may create __pycache__ when these modules are imported
+    # by local tests, so exclude that ephemeral runtime cache from the inventory.
+    allowed_root = {
+        "README.md", "CODEBOOK.md", "transform.py", "verify.py",
+        "manifest.json", "raw", "tidy", "__pycache__",
+    }
+    extra_root = sorted(entry.name for entry in directory.iterdir() if entry.name not in allowed_root)
+    if extra_root:
+        raise ValueError(
+            f"Unlisted files in synthetic package root: {', '.join(extra_root)}"
+        )
     # The manifest names one data file in each folder. Additional files are
     # not covered by its checksums and could unintentionally expose datasets
     # when a teaching package is shared or published.

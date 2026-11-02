@@ -158,6 +158,30 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             ):
                 verify_package(alias)
 
+    def test_hardlinked_deliverables_are_rejected_before_reading(self) -> None:
+        # A regular file can share an inode with an external file without
+        # being a symlink. Its current bytes and SHA-256 may still match.
+        for relative in (
+            "manifest.json", "raw/orders.csv", "tidy/orders.csv",
+            "CODEBOOK.md", "transform.py",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                outside = Path(tmp) / "shared-deliverable"
+                shutil.copyfile(target, outside)
+                target.unlink()
+                try:
+                    os.link(outside, target)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"Hard links unavailable on this runner: {error}")
+                if target.stat().st_nlink <= 1:
+                    self.skipTest("This file system does not report hard-link counts")
+                self.assertEqual(target.read_bytes(), outside.read_bytes())
+                with self.assertRaisesRegex(ValueError, "Hard link in synthetic package"):
+                    verify_package(directory)
+
     def test_nonregular_deliverables_are_rejected_without_reading(self) -> None:
         # Opening a named pipe may block forever. Reject it before attempting
         # to parse the manifest, hash a file, or execute the recipe.

@@ -115,6 +115,18 @@ def verify_package(directory: Path) -> int:
         or manifest.get("recipe") != "transform.py"
     ):
         raise ValueError("Unexpected synthetic package manifest")
+    # A checksum-verified handoff must not silently carry extra metadata,
+    # such as paths or private notes that are outside its declared schema.
+    # JSON parsing already checks duplicate keys and invalid numeric literals.
+    allowed_manifest_keys = {
+        "name", "data_type", "raw", "raw_sha256", "tidy", "tidy_sha256",
+        "codebook", "codebook_sha256", "recipe", "recipe_sha256",
+    }
+    unexpected_keys = sorted(set(manifest) - allowed_manifest_keys)
+    if unexpected_keys:
+        raise ValueError(
+            f"Unexpected JSON manifest keys: {', '.join(unexpected_keys)}"
+        )
     if not codebook.read_text(encoding="utf-8").strip():
         raise ValueError("Data dictionary is missing or empty")
     for path, key in (

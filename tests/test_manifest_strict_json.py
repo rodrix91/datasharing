@@ -61,6 +61,19 @@ class StrictManifestTests(unittest.TestCase):
                 )
                 self._check_invalid_manifest(modified, "JSON manifest numeric value")
 
+    def test_unlisted_manifest_metadata_is_rejected(self) -> None:
+        # The example handoff is a closed inventory: extra metadata is not
+        # covered by checksums and must not travel with a verified package.
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        for unexpected in (
+            '"private_note": "not part of the handoff"',
+            '"external_path": "../../outside.csv"',
+            '"hidden_columns": ["personal_id", "address"]',
+        ):
+            with self.subTest(extra=unexpected):
+                modified = original.rstrip()[:-1] + f",\n  {unexpected}\n}}\n"
+                self._check_invalid_manifest(modified, "Unexpected JSON manifest keys")
+
     def test_root_must_be_a_manifest_object(self) -> None:
         for text in ("null", "[]", "{}", '"synthetic"', "42"):
             with self.subTest(root=text):

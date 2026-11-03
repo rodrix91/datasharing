@@ -263,6 +263,34 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 ):
                     verify_package(directory)
 
+    def test_python_cache_rejects_external_hardlinked_bytecode(self) -> None:
+        # A .pyc name is permitted as ephemeral cache, but hard links can
+        # expose bytes shared with files outside this self-contained handoff.
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            cache = directory / "__pycache__"
+            cache.mkdir(exist_ok=True)
+
+            local = cache / "local.cpython-312.pyc"
+            local.write_bytes(b"ordinary temporary bytecode cache")
+            self.assertEqual(verify_package(directory), 3)
+
+            outside = Path(tmp) / "external-cache.pyc"
+            outside.write_bytes(b"shared external content")
+            linked = cache / "shared.cpython-312.pyc"
+            try:
+                os.link(outside, linked)
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"Hard links unavailable on this runner: {error}")
+            if linked.stat().st_nlink <= 1:
+                self.skipTest("This filesystem does not report hard-link counts")
+            with self.assertRaisesRegex(
+                ValueError, "Unlisted files in synthetic package Python cache"
+            ):
+                verify_package(directory)
+            self.assertEqual(outside.read_bytes(), b"shared external content")
+
     def test_unlisted_data_files_are_rejected_before_recipe_execution(self) -> None:
         # A package with valid checksums may still accidentally include
         # personal or internal files that the manifest never inventories.

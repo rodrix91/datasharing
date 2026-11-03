@@ -85,7 +85,8 @@ def verify_package(directory: Path) -> int:
         and (
             not cache.is_dir()
             or any(
-                not item.is_file() or item.is_symlink() or item.suffix != ".pyc"
+                not item.is_file() or item.is_symlink() or item.stat().st_nlink > 1
+                or item.suffix != ".pyc"
                 for item in cache.iterdir()
             )
         )

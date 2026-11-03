@@ -117,6 +117,17 @@ def verify_package(directory: Path) -> int:
         or manifest.get("recipe") != "transform.py"
     ):
         raise ValueError("Unexpected synthetic package manifest")
+    # The manifest's human-readable identity is required, not an unchecked
+    # optional field. Refuse empty, oversized, or control-character values so
+    # verified handoffs cannot carry ambiguous or terminal-spoofed labels.
+    name = manifest.get("name")
+    if (
+        not isinstance(name, str)
+        or not (1 <= len(name) <= 120)
+        or not name.isprintable()
+        or name != name.strip()
+    ):
+        raise ValueError("Invalid synthetic package manifest name")
     # A checksum-verified handoff must not silently carry extra metadata,
     # such as paths or private notes that are outside its declared schema.
     # JSON parsing already checks duplicate keys and invalid numeric literals.

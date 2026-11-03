@@ -74,6 +74,44 @@ class StrictManifestTests(unittest.TestCase):
                 modified = original.rstrip()[:-1] + f",\n  {unexpected}\n}}\n"
                 self._check_invalid_manifest(modified, "Unexpected JSON manifest keys")
 
+    def test_manifest_requires_printable_bounded_name(self) -> None:
+        original = json.loads((HANDOFF / "manifest.json").read_text(encoding="utf-8"))
+        invalid_names = (
+            None,
+            "",
+            "   ",
+            " preceding-space",
+            "trailing-space ",
+            "bad\nline",
+            "terminal\x1b[31mcolor",
+            "x" * 121,
+            5,
+            ["looks", "like", "a", "name"],
+        )
+        for invalid in invalid_names:
+            with self.subTest(name=repr(invalid)):
+                payload = dict(original)
+                payload["name"] = invalid
+                self._check_invalid_manifest(
+                    json.dumps(payload), "Invalid synthetic package manifest name"
+                )
+        without_name = dict(original)
+        del without_name["name"]
+        self._check_invalid_manifest(
+            json.dumps(without_name), "Invalid synthetic package manifest name"
+        )
+
+    def test_manifest_preserves_valid_unicode_human_readable_name(self) -> None:
+        original = json.loads((HANDOFF / "manifest.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "handoff"
+            shutil.copytree(HANDOFF, package)
+            original["name"] = "Ejemplo de órdenes sintéticas, año 2026"
+            (package / "manifest.json").write_text(
+                json.dumps(original, ensure_ascii=False), encoding="utf-8"
+            )
+            self.assertEqual(verify_package(package), 3)
+
     def test_root_must_be_a_manifest_object(self) -> None:
         for text in ("null", "[]", "{}", '"synthetic"', "42"):
             with self.subTest(root=text):

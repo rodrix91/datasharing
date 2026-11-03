@@ -134,6 +134,7 @@ def verify_package(directory: Path) -> int:
     allowed_manifest_keys = {
         "name", "data_type", "raw", "raw_sha256", "tidy", "tidy_sha256",
         "codebook", "codebook_sha256", "recipe", "recipe_sha256",
+        "readme_sha256", "verifier_sha256",
     }
     unexpected_keys = sorted(set(manifest) - allowed_manifest_keys)
     if unexpected_keys:
@@ -147,6 +148,8 @@ def verify_package(directory: Path) -> int:
         (tidy, "tidy_sha256"),
         (codebook, "codebook_sha256"),
         (recipe, "recipe_sha256"),
+        (readme, "readme_sha256"),
+        (verifier, "verifier_sha256"),
     ):
         checksum = hashlib.sha256(path.read_bytes()).hexdigest()
         if checksum != manifest.get(key):

@@ -8,5 +8,7 @@
   "recipe": "transform.py",
   "data_type": "synthetic",
   "codebook_sha256": "9fa8ebcc49a7b5f12aec068819ea12ff03de19525dd0055fda09ae79b29b350d",
-  "recipe_sha256": "1ca08a8da71934ab18eb8aaba97f7c8c1b766a2eb7daec32a3fa9cb90ff32f80"
+  "recipe_sha256": "1ca08a8da71934ab18eb8aaba97f7c8c1b766a2eb7daec32a3fa9cb90ff32f80",
+  "readme_sha256": "e386c155c106b6dffa5350bec5105d99e52712682768b8bd65c8b4ad07421655",
+  "verifier_sha256": "0f62b31ed7b93bdba69a5b352d263ce9adcd855cdac7c6412bba6e2b6cb7eb4f"
 }

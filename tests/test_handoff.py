@@ -80,8 +80,21 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
                     verify_package(directory)
 
+    def test_readme_and_verifier_content_must_match_manifest(self) -> None:
+        # A handoff must not silently ship modified usage instructions or
+        # an altered verifier, even if its four data checksums still match.
+        for relative in ("README.md", "verify.py"):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                target = directory / relative
+                target.write_bytes(target.read_bytes() + b"\\n# unreviewed change\\n")
+                with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
+                    verify_package(directory)
+
     def test_modified_or_missing_metadata_fingerprints_are_rejected(self) -> None:
-        for key in ("raw_sha256", "tidy_sha256", "codebook_sha256", "recipe_sha256"):
+        for key in ("raw_sha256", "tidy_sha256", "codebook_sha256",
+            "recipe_sha256", "readme_sha256", "verifier_sha256"):
             for replacement in (None, "0" * 64):
                 with self.subTest(key=key, replacement=replacement), tempfile.TemporaryDirectory() as tmp:
                     directory = Path(tmp) / "handoff"

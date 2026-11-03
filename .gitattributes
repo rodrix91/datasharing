@@ -4,3 +4,5 @@ examples/handoff/raw/*.csv text eol=lf
 examples/handoff/tidy/*.csv text eol=lf
 examples/handoff/CODEBOOK.md text eol=lf
 examples/handoff/transform.py text eol=lf
+examples/handoff/README.md text eol=lf
+examples/handoff/verify.py text eol=lf

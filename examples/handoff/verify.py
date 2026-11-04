@@ -5,12 +5,19 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import runpy
 from pathlib import Path
 
 # The handoff manifest is a fixed, small inventory. Refuse accidental or
 # malicious oversized metadata before parsing and allocating JSON objects.
 MAX_MANIFEST_BYTES = 64 * 1024
+
+# Only bytecode for the two declared modules is a routine cache artifact.
+# A filename ending in .pyc is not proof that an unlisted module is safe.
+_PACKAGE_BYTECODE = re.compile(
+    r"(?:verify|transform)\.cpython-[0-9]{2,4}(?:\.opt-[12])?\.pyc\Z"
+)
 
 
 def _unique_manifest_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -71,9 +78,9 @@ def verify_package(directory: Path) -> int:
                 f"Hard link in synthetic package: {file.relative_to(directory)}"
             )
     # The top-level handoff also has a fixed inventory. A stray .env, data
-    # export, or nested folder must not ship merely because the four checksums
-    # still match. Python may create __pycache__ when these modules are imported
-    # by local tests, so exclude that ephemeral runtime cache from the inventory.
+    # export, or nested folder must not ship merely because the checksums still
+    # match. Python may create __pycache__ for the two declared source modules;
+    # accept only those modules' conventional CPython cache filenames.
     allowed_root = {
         "README.md", "CODEBOOK.md", "transform.py", "verify.py",
         "manifest.json", "raw", "tidy", "__pycache__",
@@ -90,7 +97,7 @@ def verify_package(directory: Path) -> int:
             not cache.is_dir()
             or any(
                 not item.is_file() or item.is_symlink() or item.stat().st_nlink > 1
-                or item.suffix != ".pyc"
+                or _PACKAGE_BYTECODE.fullmatch(item.name) is None
                 for item in cache.iterdir()
             )
         )

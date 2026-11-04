@@ -8,6 +8,10 @@ import math
 import runpy
 from pathlib import Path
 
+# The handoff manifest is a fixed, small inventory. Refuse accidental or
+# malicious oversized metadata before parsing and allocating JSON objects.
+MAX_MANIFEST_BYTES = 64 * 1024
+
 
 def _unique_manifest_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Fail closed on duplicate member names at every JSON object depth."""
@@ -103,12 +107,19 @@ def verify_package(directory: Path) -> int:
             raise ValueError(
                 f"Unlisted files in synthetic package {folder.name}/: {', '.join(unexpected)}"
             )
-    manifest = json.loads(
-        manifest_path.read_text(encoding="utf-8"),
-        object_pairs_hook=_unique_manifest_keys,
-        parse_constant=_reject_manifest_constant,
-        parse_float=_finite_manifest_float,
-    )
+    if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
+        raise ValueError("Synthetic package manifest exceeds the maximum size")
+    try:
+        manifest = json.loads(
+            manifest_path.read_text(encoding="utf-8"),
+            object_pairs_hook=_unique_manifest_keys,
+            parse_constant=_reject_manifest_constant,
+            parse_float=_finite_manifest_float,
+        )
+    except RecursionError as exc:
+        # An extremely deeply nested JSON array/object can exhaust CPython's
+        # decoder recursion limit before the closed manifest schema is checked.
+        raise ValueError("Synthetic package manifest is too deeply nested") from exc
     if (
         not isinstance(manifest, dict)
         or manifest.get("data_type") != "synthetic"

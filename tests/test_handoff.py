@@ -6,6 +6,7 @@ from decimal import getcontext
 import hashlib
 import json
 import os
+import py_compile
 import shutil
 import subprocess
 import sys
@@ -243,11 +244,17 @@ class SyntheticDataHandoffTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / "handoff"
             shutil.copytree(ROOT, directory)
-            (directory / "__pycache__").mkdir(exist_ok=True)
+            # Compile the actual declared sources instead of inventing a
+            # cache file with an unrelated module name.
+            py_compile.compile(str(directory / "verify.py"), doraise=True)
+            py_compile.compile(str(directory / "transform.py"), doraise=True)
             self.assertEqual(verify_package(directory), 3)
 
     def test_python_cache_rejects_untracked_data_and_directories(self) -> None:
-        for extra in (".env", "secret.csv", "nested"):
+        for extra in (
+            ".env", "secret.csv", "nested", "private.cpython-312.pyc",
+            "verify.cpython-312.opt-3.pyc", "transform.cpython-312.pyc.bak",
+        ):
             with self.subTest(extra=extra), tempfile.TemporaryDirectory() as tmp:
                 directory = Path(tmp) / "handoff"
                 shutil.copytree(ROOT, directory)
@@ -272,13 +279,13 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             cache = directory / "__pycache__"
             cache.mkdir(exist_ok=True)
 
-            local = cache / "local.cpython-312.pyc"
+            local = cache / "verify.cpython-312.pyc"
             local.write_bytes(b"ordinary temporary bytecode cache")
             self.assertEqual(verify_package(directory), 3)
 
             outside = Path(tmp) / "external-cache.pyc"
             outside.write_bytes(b"shared external content")
-            linked = cache / "shared.cpython-312.pyc"
+            linked = cache / "transform.cpython-312.pyc"
             try:
                 os.link(outside, linked)
             except (OSError, NotImplementedError) as error:

@@ -83,7 +83,9 @@ class StrictManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary) / "handoff"
             shutil.copytree(HANDOFF, package)
-            (package / "manifest.json").write_text(payload, encoding="utf-8")
+            # write_text() translates LF to CRLF on Windows, silently
+            # exceeding the byte limit. Preserve the exact-size UTF-8 bytes.
+            (package / "manifest.json").write_bytes(payload.encode("utf-8"))
             self.assertEqual(verify_package(package), 3)
 
     def test_unlisted_manifest_metadata_is_rejected(self) -> None:

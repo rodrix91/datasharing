@@ -12,7 +12,7 @@ from pathlib import Path
 HANDOFF = Path(__file__).resolve().parents[1] / "examples" / "handoff"
 sys.path.insert(0, str(HANDOFF))
 
-from verify import verify_package  # noqa: E402
+from verify import MAX_MANIFEST_BYTES, verify_package  # noqa: E402
 
 
 class StrictManifestTests(unittest.TestCase):
@@ -60,6 +60,33 @@ class StrictManifestTests(unittest.TestCase):
                     f',\n  "extra": {literal}\n}}\n'
                 )
                 self._check_invalid_manifest(modified, "JSON manifest numeric value")
+
+    def test_oversized_manifest_is_rejected_before_parsing(self) -> None:
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        assert len(original.encode("utf-8")) < MAX_MANIFEST_BYTES
+        self._check_invalid_manifest(
+            original + " " * (MAX_MANIFEST_BYTES + 1),
+            "manifest exceeds the maximum size",
+        )
+
+    def test_deeply_nested_manifest_is_a_controlled_validation_error(self) -> None:
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        nested = "[" * 1400 + "0" + "]" * 1400
+        modified = original.rstrip()[:-1] + ', "extra": ' + nested + "}"
+        assert len(modified.encode("utf-8")) < MAX_MANIFEST_BYTES
+        self._check_invalid_manifest(modified, "manifest is too deeply nested")
+
+    def test_manifest_at_maximum_size_remains_accepted(self) -> None:
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        payload = original + " " * (MAX_MANIFEST_BYTES - len(original.encode("utf-8")))
+        assert len(payload.encode("utf-8")) == MAX_MANIFEST_BYTES
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "handoff"
+            shutil.copytree(HANDOFF, package)
+            # write_text() translates LF to CRLF on Windows, silently
+            # exceeding the byte limit. Preserve the exact-size UTF-8 bytes.
+            (package / "manifest.json").write_bytes(payload.encode("utf-8"))
+            self.assertEqual(verify_package(package), 3)
 
     def test_unlisted_manifest_metadata_is_rejected(self) -> None:
         # The example handoff is a closed inventory: extra metadata is not

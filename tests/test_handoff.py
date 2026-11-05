@@ -13,17 +13,44 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1] / "examples" / "handoff"
 sys.path.insert(0, str(ROOT))
 
 from transform import make_tidy  # noqa: E402
-from verify import verify_package  # noqa: E402
+from verify import CHUNK_BYTES, _file_sha256, _matches_utf8_file, verify_package  # noqa: E402
 
 
 class SyntheticDataHandoffTests(unittest.TestCase):
     def test_complete_handoff_is_verified(self) -> None:
         self.assertEqual(verify_package(ROOT), 3)
+
+    def test_full_verification_never_bulk_reads_a_deliverable(self) -> None:
+        # The verifier must not materialize another copy of each file just
+        # to compute checksums or compare the canonical tidy output.
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            with patch.object(Path, "read_bytes", side_effect=AssertionError("bulk read")):
+                self.assertEqual(verify_package(directory), 3)
+
+    def test_chunked_checksums_and_utf8_comparison_cover_all_boundaries(self) -> None:
+        # A mismatch after multiple chunks or an extra suffix must not
+        # disappear merely because the first block was correct.
+        content = ("A" * (CHUNK_BYTES - 1)) + "é" + ("B" * (CHUNK_BYTES + 7))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "large-tidy.csv"
+            encoded = content.encode("utf-8")
+            path.write_bytes(encoded)
+            self.assertEqual(_file_sha256(path), hashlib.sha256(encoded).hexdigest())
+            self.assertTrue(_matches_utf8_file(path, content))
+            path.write_bytes(encoded + b"\\n")
+            self.assertFalse(_matches_utf8_file(path, content))
+            path.write_bytes(encoded[:-1] + b"C")
+            self.assertFalse(_matches_utf8_file(path, content))
+            path.write_bytes(encoded[:-2])
+            self.assertFalse(_matches_utf8_file(path, content))
 
     def test_raw_file_is_never_rewritten_by_transformation(self) -> None:
         raw = ROOT / "raw" / "orders.csv"

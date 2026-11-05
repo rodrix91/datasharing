@@ -43,6 +43,30 @@ def _finite_manifest_float(value: str) -> float:
     return number
 
 
+# Keep checksum and canonical-byte comparisons bounded even when a data
+# deliverable grows beyond this intentionally small example.
+CHUNK_BYTES = 64 * 1024
+
+
+def _file_sha256(path: Path) -> str:
+    """Hash raw file bytes without allocating the entire deliverable."""
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(CHUNK_BYTES), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _matches_utf8_file(path: Path, expected: str) -> bool:
+    """Compare exact UTF-8 bytes in chunks, including EOF and line endings."""
+    with path.open("rb") as source:
+        for offset in range(0, len(expected), CHUNK_BYTES):
+            chunk = expected[offset : offset + CHUNK_BYTES].encode("utf-8")
+            if source.read(len(chunk)) != chunk:
+                return False
+        return source.read(1) == b""
+
+
 def verify_package(directory: Path) -> int:
     """Verify raw provenance, tidy provenance and deterministic reproducibility."""
     raw = directory / "raw" / "orders.csv"
@@ -170,7 +194,7 @@ def verify_package(directory: Path) -> int:
         (readme, "readme_sha256"),
         (verifier, "verifier_sha256"),
     ):
-        checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+        checksum = _file_sha256(path)
         if checksum != manifest.get(key):
             raise ValueError(f"Checksum mismatch for {path.name}: package file was modified")
     # Never execute the recipe until its recorded fingerprint has been checked.
@@ -182,9 +206,11 @@ def verify_package(directory: Path) -> int:
     expected = make_tidy(raw)
     # Compare canonical UTF-8 bytes, not text opened in universal-newline
     # mode: read_text() silently treats CRLF or bare CR as LF on all platforms.
-    if tidy.read_bytes() != expected.encode("utf-8"):
+    if not _matches_utf8_file(tidy, expected):
         raise ValueError("Tidy data does not reproduce from the unchanged raw dataset")
-    return len(expected.splitlines()) - 1
+    # The canonical CSV writer emits one LF-terminated header and one line
+    # per row. Counting linefeeds avoids allocating a second list of rows.
+    return expected.count("\n") - 1
 
 
 if __name__ == "__main__":

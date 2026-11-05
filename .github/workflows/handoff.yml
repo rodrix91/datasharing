@@ -13,7 +13,10 @@ jobs:
   verify:
     runs-on: ${{ matrix.os }}
     name: Python standard library (${{ matrix.os }})
-    timeout-minutes: 15
+    # macOS hosted runners may spend the short timeout waiting for capacity.
+    # Keep Linux/Windows bounded at 15m while allowing 30m for macOS allocation;
+    # do not omit or relax any of the verification steps.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 30 || 15 }}
     strategy:
       fail-fast: false
       matrix:

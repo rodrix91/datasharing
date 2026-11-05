@@ -21,12 +21,19 @@ _PACKAGE_BYTECODE = re.compile(
 )
 
 
+def _manifest_error_label(value: str, *, limit: int = 120) -> str:
+    """Escape and bound untrusted JSON labels before emitting diagnostics."""
+    if len(value) <= limit:
+        return repr(value)
+    return repr(value[:limit]) + " [truncated]"
+
+
 def _unique_manifest_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Fail closed on duplicate member names at every JSON object depth."""
     result: dict[str, object] = {}
     for name, value in pairs:
         if name in result:
-            raise ValueError(f"Duplicate JSON manifest key: {name!r}")
+            raise ValueError(f"Duplicate JSON manifest key: {_manifest_error_label(name)}")
         result[name] = value
     return result
 
@@ -40,7 +47,7 @@ def _finite_manifest_float(value: str) -> float:
     """Do not silently decode oversized JSON numeric exponents as infinity."""
     number = float(value)
     if not math.isfinite(number):
-        raise ValueError(f"Non-finite JSON manifest numeric value: {value}")
+        raise ValueError(f"Non-finite JSON manifest numeric value: {_manifest_error_label(value)}")
     return number
 
 
@@ -193,9 +200,12 @@ def verify_package(directory: Path) -> int:
     }
     unexpected_keys = sorted(set(manifest) - allowed_manifest_keys)
     if unexpected_keys:
-        raise ValueError(
-            f"Unexpected JSON manifest keys: {', '.join(unexpected_keys)}"
-        )
+        # The manifest itself is capped at 64 KiB, but its field names can
+        # still overwhelm CLI/CI logs. Report only three bounded examples.
+        examples = ", ".join(_manifest_error_label(key) for key in unexpected_keys[:3])
+        if len(unexpected_keys) > 3:
+            examples += f" (+{len(unexpected_keys) - 3} more)"
+        raise ValueError(f"Unexpected JSON manifest keys: {examples}")
     if not codebook.read_text(encoding="utf-8").strip():
         raise ValueError("Data dictionary is missing or empty")
     for path, key in (

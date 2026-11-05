@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1] / "examples" / "handoff"
 sys.path.insert(0, str(ROOT))
 
 from transform import make_tidy  # noqa: E402
-from verify import CHUNK_BYTES, _file_sha256, _matches_utf8_file, verify_package  # noqa: E402
+from verify import CHUNK_BYTES, _file_sha256, _matches_utf8_file, _utf8_chunks, verify_package  # noqa: E402
 
 
 class SyntheticDataHandoffTests(unittest.TestCase):
@@ -51,6 +51,25 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             self.assertFalse(_matches_utf8_file(path, content))
             path.write_bytes(encoded[:-2])
             self.assertFalse(_matches_utf8_file(path, content))
+
+    def test_utf8_byte_chunks_respect_real_byte_boundaries(self) -> None:
+        # Every astral character needs four UTF-8 bytes. A chunk of
+        # CHUNK_BYTES characters would make a 4 * CHUNK_BYTES read.
+        unicode_text = "😀" * (CHUNK_BYTES + 3) + "é" + "Z"
+        fragments = list(_utf8_chunks(unicode_text))
+        self.assertGreater(len(fragments), 1)
+        self.assertTrue(all(0 < len(part) <= CHUNK_BYTES for part in fragments))
+        self.assertEqual(b"".join(fragments), unicode_text.encode("utf-8"))
+
+        # Read-back must compare the entire file, not only the first block,
+        # including a character that falls on a fragment boundary.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "unicode-tidy.csv"
+            encoded = unicode_text.encode("utf-8")
+            path.write_bytes(encoded)
+            self.assertTrue(_matches_utf8_file(path, unicode_text))
+            path.write_bytes(encoded[:-1] + b"Y")
+            self.assertFalse(_matches_utf8_file(path, unicode_text))
 
     def test_raw_file_is_never_rewritten_by_transformation(self) -> None:
         raw = ROOT / "raw" / "orders.csv"

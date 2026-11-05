@@ -23,6 +23,58 @@ from verify import CHUNK_BYTES, _file_sha256, _matches_utf8_file, _utf8_chunks, 
 
 
 class SyntheticDataHandoffTests(unittest.TestCase):
+    def test_manifest_diagnostics_bound_untrusted_json_labels(self) -> None:
+        # A bounded input file can still contain a very long JSON key or
+        # numeric exponent. Never amplify those values into CI logs.
+        long_key = "private-" + "X" * 15000 + "-secret-tail"
+        for label, source, expected in (
+            (
+                "duplicate key",
+                json.dumps({long_key: 1})[:-1] + "," + json.dumps(long_key) + ":2}",
+                "Duplicate JSON manifest key",
+            ),
+            (
+                "nonfinite exponent",
+                '{"unused":1e' + "9" * 15000 + "}",
+                "Non-finite JSON manifest numeric value",
+            ),
+        ):
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                (directory / "manifest.json").write_text(source, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, expected) as caught:
+                    verify_package(directory)
+                diagnostic = str(caught.exception)
+                self.assertLess(len(diagnostic), 400)
+                self.assertIn("[truncated]", diagnostic)
+                self.assertNotIn("-secret-tail", diagnostic)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            manifest_path = directory / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest[long_key] = 1
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Unexpected JSON manifest keys") as caught:
+                verify_package(directory)
+            self.assertIn("[truncated]", str(caught.exception))
+            self.assertNotIn("-secret-tail", str(caught.exception))
+            self.assertLess(len(str(caught.exception)), 400)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            manifest_path = directory / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest.update({f"unapproved-{i}": i for i in range(12)})
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Unexpected JSON manifest keys") as caught:
+                verify_package(directory)
+            self.assertIn("(+9 more)", str(caught.exception))
+            self.assertLess(len(str(caught.exception)), 400)
+
     def test_complete_handoff_is_verified(self) -> None:
         self.assertEqual(verify_package(ROOT), 3)
 

@@ -7,6 +7,7 @@ import json
 import math
 import re
 import runpy
+from collections.abc import Iterator
 from pathlib import Path
 
 # The handoff manifest is a fixed, small inventory. Refuse accidental or
@@ -57,11 +58,22 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _utf8_chunks(expected: str) -> Iterator[bytes]:
+    """Yield UTF-8 fragments that cannot exceed CHUNK_BYTES real bytes.
+
+    A Unicode code point uses at most four UTF-8 bytes. Slicing the string
+    into CHUNK_BYTES characters, as opposed to bytes, could make one read
+    four times larger than the claimed memory bound.
+    """
+    width = CHUNK_BYTES // 4
+    for offset in range(0, len(expected), width):
+        yield expected[offset : offset + width].encode("utf-8")
+
+
 def _matches_utf8_file(path: Path, expected: str) -> bool:
-    """Compare exact UTF-8 bytes in chunks, including EOF and line endings."""
+    """Compare exact UTF-8 bytes in bounded chunks, including EOF and line endings."""
     with path.open("rb") as source:
-        for offset in range(0, len(expected), CHUNK_BYTES):
-            chunk = expected[offset : offset + CHUNK_BYTES].encode("utf-8")
+        for chunk in _utf8_chunks(expected):
             if source.read(len(chunk)) != chunk:
                 return False
         return source.read(1) == b""

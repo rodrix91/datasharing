@@ -396,6 +396,48 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 verify_package(directory)
             self.assertEqual(outside.read_bytes(), b"shared external content")
 
+    def test_unlisted_file_diagnostics_are_bounded_and_log_safe(self) -> None:
+        # Unexpected filenames are attacker-controlled too. Do not amplify
+        # every name into CI logs or reveal a long suffix unnecessarily.
+        long_name = "a-" + "X" * 180 + "-hidden-filename.txt"
+        for location in ("", "raw", "tidy"):
+            with self.subTest(location=location or "root"), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                folder = directory / location
+                for name in (long_name, "b-extra.txt", "c-extra.txt",
+                             "d-extra.txt", "z-unlisted-private.csv"):
+                    (folder / name).write_text("unlisted", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValueError, "Unlisted files in synthetic package"
+                ) as caught:
+                    verify_package(directory)
+                message = str(caught.exception)
+                self.assertLess(len(message), 500)
+                self.assertIn("[truncated]", message)
+                self.assertIn("(+2 more)", message)
+                self.assertNotIn("hidden-filename", message)
+                self.assertNotIn("z-unlisted-private.csv", message)
+
+        # Windows forbids these filename characters, but POSIX allows them.
+        # A literal newline or terminal escape must never control CI output.
+        if os.name != "nt":
+            with tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                (directory / "bad\\n\\x1b[31mname.csv").write_text(
+                    "unlisted", encoding="utf-8"
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "Unlisted files in synthetic package root"
+                ) as caught:
+                    verify_package(directory)
+                message = str(caught.exception)
+                self.assertNotIn("\\n", message.replace("\\\\n", ""))
+                self.assertNotIn("\\x1b", message.replace("\\\\x1b", ""))
+                self.assertIn("\\\\n", message)
+                self.assertIn("\\\\x1b", message)
+
     def test_unlisted_data_files_are_rejected_before_recipe_execution(self) -> None:
         # A package with valid checksums may still accidentally include
         # personal or internal files that the manifest never inventories.

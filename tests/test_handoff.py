@@ -23,6 +23,31 @@ from verify import CHUNK_BYTES, _file_sha256, _matches_utf8_file, _utf8_chunks, 
 
 
 class SyntheticDataHandoffTests(unittest.TestCase):
+    def test_control_heavy_manifest_keys_keep_escaped_diagnostics_bounded(self) -> None:
+        # A 120-character key is within the source-text limit, but Python
+        # repr() expands controls and backslashes into several log characters.
+        # Truncate *after* escaping, without exposing raw control sequences.
+        for label in (
+            chr(27) * 120,
+            chr(10) * 120,
+            chr(92) * 120,
+            chr(0x2028) * 120,
+        ):
+            with self.subTest(character=ord(label[0])), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                duplicate_keys = "{" + json.dumps(label) + ":1," + json.dumps(label) + ":2}"
+                (directory / "manifest.json").write_text(
+                    duplicate_keys, encoding="utf-8"
+                )
+                with self.assertRaisesRegex(ValueError, "Duplicate JSON manifest key") as caught:
+                    verify_package(directory)
+                diagnostic = str(caught.exception)
+                self.assertLessEqual(len(diagnostic), 180)
+                self.assertIn("[truncated]", diagnostic)
+                self.assertNotIn(chr(27), diagnostic)
+                self.assertNotIn(chr(10), diagnostic)
+
     def test_manifest_diagnostics_bound_untrusted_json_labels(self) -> None:
         # A bounded input file can still contain a very long JSON key or
         # numeric exponent. Never amplify those values into CI logs.

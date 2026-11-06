@@ -22,10 +22,11 @@ _PACKAGE_BYTECODE = re.compile(
 
 
 def _manifest_error_label(value: str, *, limit: int = 120) -> str:
-    """Escape and bound untrusted JSON labels before emitting diagnostics."""
-    if len(value) <= limit:
-        return repr(value)
-    return repr(value[:limit]) + " [truncated]"
+    """Bound the *escaped* diagnostic, not its potentially shorter source."""
+    escaped = repr(value)
+    if len(escaped) <= limit:
+        return escaped
+    return escaped[:limit] + " [truncated]"
 
 
 def _bounded_unlisted_names(names: list[str]) -> str:

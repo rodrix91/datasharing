@@ -28,6 +28,14 @@ def _manifest_error_label(value: str, *, limit: int = 120) -> str:
     return repr(value[:limit]) + " [truncated]"
 
 
+def _bounded_unlisted_names(names: list[str]) -> str:
+    """Escape and limit unexpected filesystem entry names in diagnostics."""
+    examples = ", ".join(_manifest_error_label(name) for name in names[:3])
+    if len(names) > 3:
+        examples += f" (+{len(names) - 3} more)"
+    return examples
+
+
 def _unique_manifest_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Fail closed on duplicate member names at every JSON object depth."""
     result: dict[str, object] = {}
@@ -131,7 +139,7 @@ def verify_package(directory: Path) -> int:
     extra_root = sorted(entry.name for entry in directory.iterdir() if entry.name not in allowed_root)
     if extra_root:
         raise ValueError(
-            f"Unlisted files in synthetic package root: {', '.join(extra_root)}"
+            f"Unlisted files in synthetic package root: {_bounded_unlisted_names(extra_root)}"
         )
     cache = directory / "__pycache__"
     if cache.is_symlink() or (
@@ -155,7 +163,7 @@ def verify_package(directory: Path) -> int:
         )
         if unexpected:
             raise ValueError(
-                f"Unlisted files in synthetic package {folder.name}/: {', '.join(unexpected)}"
+                f"Unlisted files in synthetic package {folder.name}/: {_bounded_unlisted_names(unexpected)}"
             )
     if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
         raise ValueError("Synthetic package manifest exceeds the maximum size")

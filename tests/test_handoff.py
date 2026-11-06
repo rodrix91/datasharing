@@ -433,10 +433,10 @@ class SyntheticDataHandoffTests(unittest.TestCase):
                 ) as caught:
                     verify_package(directory)
                 message = str(caught.exception)
-                self.assertNotIn("\\n", message.replace("\\\\n", ""))
-                self.assertNotIn("\\x1b", message.replace("\\\\x1b", ""))
-                self.assertIn("\\\\n", message)
-                self.assertIn("\\\\x1b", message)
+                self.assertNotIn(chr(10), message)
+                self.assertNotIn(chr(27), message)
+                self.assertIn(chr(92) + "n", message)
+                self.assertIn(chr(92) + "x1b", message)
 
     def test_unlisted_data_files_are_rejected_before_recipe_execution(self) -> None:
         # A package with valid checksums may still accidentally include

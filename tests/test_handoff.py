@@ -425,7 +425,7 @@ class SyntheticDataHandoffTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 directory = Path(tmp) / "handoff"
                 shutil.copytree(ROOT, directory)
-                (directory / "bad\\n\\x1b[31mname.csv").write_text(
+                (directory / "bad\n\x1b[31mname.csv").write_text(
                     "unlisted", encoding="utf-8"
                 )
                 with self.assertRaisesRegex(

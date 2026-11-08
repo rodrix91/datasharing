@@ -95,6 +95,20 @@ def _matches_utf8_file(path: Path, expected: str) -> bool:
         return source.read(1) == b""
 
 
+def _has_non_whitespace_utf8(path: Path) -> bool:
+    """Validate all UTF-8 bytes and detect content without loading the whole file.
+
+    Continue decoding even after finding visible text: a malformed UTF-8
+    sequence later in a codebook must still fail strict validation.
+    """
+    has_content = False
+    with path.open("r", encoding="utf-8", newline="") as source:
+        for chunk in iter(lambda: source.read(CHUNK_BYTES // 4), ""):
+            if not chunk.isspace():
+                has_content = True
+    return has_content
+
+
 def verify_package(directory: Path) -> int:
     """Verify raw provenance, tidy provenance and deterministic reproducibility."""
     raw = directory / "raw" / "orders.csv"
@@ -215,7 +229,7 @@ def verify_package(directory: Path) -> int:
         if len(unexpected_keys) > 3:
             examples += f" (+{len(unexpected_keys) - 3} more)"
         raise ValueError(f"Unexpected JSON manifest keys: {examples}")
-    if not codebook.read_text(encoding="utf-8").strip():
+    if not _has_non_whitespace_utf8(codebook):
         raise ValueError("Data dictionary is missing or empty")
     for path, key in (
         (raw, "raw_sha256"),

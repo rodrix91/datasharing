@@ -5,9 +5,16 @@ on:
     branches: [master]
   push:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# A new commit on the same PR or branch supersedes an unfinished run.
+# Manual verification on master remains available from the Actions tab.
+concurrency:
+  group: handoff-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:

@@ -66,7 +66,6 @@ class StreamingCodebookTests(unittest.TestCase):
             with self.assertRaises(UnicodeDecodeError):
                 verify_package(directory)
 
-
     def test_rehashed_codebook_rejects_hidden_terminal_controls(self) -> None:
         # A matching manifest checksum does not make control bytes safe.
         # Put the byte after the first streaming chunk to test full coverage.
@@ -92,7 +91,7 @@ class StreamingCodebookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / "handoff"
             shutil.copytree(ROOT, directory)
-            payload = "# Data dictionary\r\n\\tRegión y código: 東京, 🧾\n".encode("utf-8")
+            payload = "# Data dictionary\r\n\tRegión y código: 東京, 🧾\n".encode("utf-8")
             replace_codebook(directory, payload)
             self.assertEqual(verify_package(directory), 3)
 

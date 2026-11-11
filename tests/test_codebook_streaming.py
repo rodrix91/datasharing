@@ -96,5 +96,30 @@ class StreamingCodebookTests(unittest.TestCase):
             self.assertEqual(verify_package(directory), 3)
 
 
+    def test_rehashed_codebook_rejects_unicode_bidi_and_c1_controls(self) -> None:
+        # Bidi overrides and C1 controls can disguise the logical Markdown.
+        # Even an updated checksum must not turn the document into safe text.
+        cases = (
+            ("right-to-left override", "\u202e"),
+            ("right-to-left isolate", "\u2067"),
+            ("right-to-left mark", "\u200f"),
+            ("arabic letter mark", "\u061c"),
+            ("C1 next line", "\u0085"),
+        )
+        for label, marker in cases:
+            with self.subTest(marker=label), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                payload = (
+                    b"# Data dictionary\n"
+                    + b"Long descriptive field " * (CHUNK_BYTES // 22 + 5)
+                    + marker.encode("utf-8")
+                    + b"\n"
+                )
+                replace_codebook(directory, payload)
+                with self.assertRaisesRegex(ValueError, "unsafe control characters"):
+                    verify_package(directory)
+
+
 if __name__ == "__main__":
     unittest.main()

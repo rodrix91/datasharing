@@ -145,5 +145,28 @@ class StrictManifestTests(unittest.TestCase):
                 self._check_invalid_manifest(text, "Unexpected synthetic package manifest")
 
 
+    def test_oversized_integer_literals_fail_with_clear_error(self) -> None:
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        # A literal exceeding CPython's int conversion digit limit used to
+        # fail during json.loads(), before closed-schema validation.
+        for number in ("9" * 5000, "-" + "9" * 5000):
+            with self.subTest(negative=number.startswith("-")):
+                modified = (
+                    original.rstrip()[:-1]
+                    + ', "unapproved": '
+                    + number
+                    + "}\n"
+                )
+                self.assertLess(len(modified.encode("utf-8")), MAX_MANIFEST_BYTES)
+                self._check_invalid_manifest(
+                    modified, "JSON manifest integer exceeds maximum digits"
+                )
+
+    def test_small_undeclared_integer_remains_a_schema_error(self) -> None:
+        original = (HANDOFF / "manifest.json").read_text(encoding="utf-8")
+        modified = original.rstrip()[:-1] + ', "unapproved": 123}\n'
+        self._check_invalid_manifest(modified, "Unexpected JSON manifest keys")
+
+
 if __name__ == "__main__":
     unittest.main()

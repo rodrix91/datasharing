@@ -67,5 +67,35 @@ class StreamingCodebookTests(unittest.TestCase):
                 verify_package(directory)
 
 
+    def test_rehashed_codebook_rejects_hidden_terminal_controls(self) -> None:
+        # A matching manifest checksum does not make control bytes safe.
+        # Put the byte after the first streaming chunk to test full coverage.
+        for label, unsafe_byte in (
+            ("nul", b"\x00"),
+            ("escape", b"\x1b"),
+            ("delete", b"\x7f"),
+        ):
+            with self.subTest(control=label), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / "handoff"
+                shutil.copytree(ROOT, directory)
+                payload = (
+                    b"# Data dictionary\n"
+                    + b"Visible description " * (CHUNK_BYTES // 15 + 2)
+                    + unsafe_byte
+                    + b"\n"
+                )
+                replace_codebook(directory, payload)
+                with self.assertRaisesRegex(ValueError, "unsafe control characters"):
+                    verify_package(directory)
+
+    def test_readable_codebook_accepts_normal_formatting_and_unicode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "handoff"
+            shutil.copytree(ROOT, directory)
+            payload = "# Data dictionary\r\n\\tRegión y código: 東京, 🧾\n".encode("utf-8")
+            replace_codebook(directory, payload)
+            self.assertEqual(verify_package(directory), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

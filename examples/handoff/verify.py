@@ -64,6 +64,11 @@ def _finite_manifest_float(value: str) -> float:
 # deliverable grows beyond this intentionally small example.
 CHUNK_BYTES = 64 * 1024
 
+# A codebook is human-readable Markdown, not a binary attachment. Disallow
+# ASCII controls that can alter terminals or hide embedded bytes while
+# retaining ordinary tabs and line breaks.
+_UNSAFE_CODEBOOK_CONTROLS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 
 def _file_sha256(path: Path) -> str:
     """Hash raw file bytes without allocating the entire deliverable."""
@@ -104,6 +109,8 @@ def _has_non_whitespace_utf8(path: Path) -> bool:
     has_content = False
     with path.open("r", encoding="utf-8", newline="") as source:
         for chunk in iter(lambda: source.read(CHUNK_BYTES // 4), ""):
+            if _UNSAFE_CODEBOOK_CONTROLS.search(chunk):
+                raise ValueError("Data dictionary contains unsafe control characters")
             if not chunk.isspace():
                 has_content = True
     return has_content

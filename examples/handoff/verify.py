@@ -60,14 +60,23 @@ def _finite_manifest_float(value: str) -> float:
     return number
 
 
+def _bounded_manifest_int(value: str) -> int:
+    """Keep huge JSON integers from causing Python digit-limit failures."""
+    if len(value.lstrip("-")) > 512:
+        raise ValueError("JSON manifest integer exceeds maximum digits")
+    return int(value)
+
+
 # Keep checksum and canonical-byte comparisons bounded even when a data
 # deliverable grows beyond this intentionally small example.
 CHUNK_BYTES = 64 * 1024
 
-# A codebook is human-readable Markdown, not a binary attachment. Disallow
-# ASCII controls that can alter terminals or hide embedded bytes while
-# retaining ordinary tabs and line breaks.
-_UNSAFE_CODEBOOK_CONTROLS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# A human-readable codebook must not contain terminal controls or Unicode
+# bidirectional formatting directives that can conceal/reorder visible text.
+# Permit ordinary tabs, line endings and multilingual prose.
+_UNSAFE_CODEBOOK_CONTROLS = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"
+)
 
 
 def _file_sha256(path: Path) -> str:
@@ -195,6 +204,7 @@ def verify_package(directory: Path) -> int:
             object_pairs_hook=_unique_manifest_keys,
             parse_constant=_reject_manifest_constant,
             parse_float=_finite_manifest_float,
+            parse_int=_bounded_manifest_int,
         )
     except RecursionError as exc:
         # An extremely deeply nested JSON array/object can exhaust CPython's
